@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BizSpin — Find an idea. Build it. Launch it.</title>
+    <!-- Load Tailwind CSS via CDN for rapid UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Google Fonts (Inter) for typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0f172a',    // Slate 900
+                            darker: '#020617',  // Slate 950
+                            card: '#1e293b',    // Slate 800
+                            border: '#334155',  // Slate 700
+                            cyan: '#06b6d4',    // Cyan 500
+                            purple: '#8b5cf6',  // Violet 500
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'blob': 'blob 7s infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.4s ease-out forwards',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        /* Custom Scrollbar for a premium feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Glassmorphism utility */
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Gradient text utility */
+        .text-gradient {
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-image: linear-gradient(to right, #06b6d4, #8b5cf6);
+        }
+
+        /* Wheel specific styling */
+        .wheel-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1/1;
+            margin: 0 auto;
+            border-radius: 50%;
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.15), inset 0 0 20px rgba(6, 182, 212, 0.1);
+            background: #0f172a;
+            padding: 10px;
+            /* Inner glowing border effect */
+        }
+        
+        .wheel-container::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.05);
+            pointer-events: none;
+        }
+
+        #wheelCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: block;
+        }
+
+        /* The center spin button overlaid on the canvas */
+        .spin-btn-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #06b6d4, #8b5cf6);
+            color: white;
+            font-weight: bold;
+            font-size: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(139, 92, 246, 0.5), inset 0 0 10px rgba(255,255,255,0.3);
+            border: 4px solid #0f172a;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10;
+        }
+
+        .spin-btn-center:hover:not(:disabled) {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 0 35px rgba(6, 182, 212, 0.6), inset 0 0 15px rgba(255,255,255,0.4);
+        }
+
+        .spin-btn-center:active:not(:disabled) {
+            transform: translate(-50%, -50%) scale(0.95);
+        }
+
+        .spin-btn-center:disabled {
+            background: #334155;
+            cursor: not-allowed;
+            box-shadow: none;
+            color: #94a3b8;
+        }
+
+        .spin-icon {
+            font-size: 1.5rem;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+
+        /* Pointer at the top of the wheel */
+        .wheel-pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 35px solid #f8fafc;
+            z-index: 20;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+        }
+        
+        .wheel-pointer::after {
+             content: '';
+             position: absolute;
+             top: -34px;
+             left: -16px;
+             border-left: 16px solid transparent;
+             border-right: 16px solid transparent;
+             border-top: 28px solid #06b6d4;
+             z-index: 21;
+        }
+
+        /* Dynamic result card entrance animation */
+        .result-entrance {
+            animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Category Filter Button active state */
+        .filter-btn.active {
+            background: linear-gradient(to right, #06b6d4, #8b5cf6);
+            color: white;
+            border-color: transparent;
+        }
+    </style>
+</head>
+<body class="antialiased relative min-h-screen flex flex-col">
+
+    <!-- Ambient Background Blobs -->
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob"></div>
+        <div class="absolute top-[20%] right-[-10%] w-96 h-96 bg-cyan-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000"></div>
+        <div class="absolute bottom-[-20%] left-[20%] w-[500px] h-[500px] bg-blue-600/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 glass border-b border-brand-border/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 cursor-pointer" onclick="window.scrollTo(0,0)">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/30">
+                        ⚡
+                    </div>
+                    <span class="font-bold text-xl tracking-tight">Biz<span class="text-gradient">Spin</span></span>
+                </div>
+                <div>
+                    <span class="hidden sm:inline-block px-3 py-1 text-xs font-semibold tracking-wider text-cyan-300 bg-cyan-950/50 border border-cyan-800 rounded-full">
+                        63+ BUSINESS IDEAS
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        
+        <!-- Hero Section -->
+        <div class="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
+            <p class="text-xs sm:text-sm font-bold tracking-widest text-purple-400 uppercase mb-3">🚀 FIND YOUR NEXT OPPORTUNITY</p>
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-4 leading-tight">
+                Spin. Discover.<br/>
+                <span class="text-gradient">Build Something.</span>
+            </h1>
+            <p class="text-lg text-slate-400 max-w-2xl mx-auto">
+                Can't decide what online business to start? Spin the wheel and let your next idea find you.
+            </p>
+        </div>
+
+        <!-- Wheel and Result Section (Two Columns on Desktop) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start mb-24">
+            
+            <!-- Left Column: The Wheel -->
+            <div class="lg:col-span-7 flex flex-col items-center">
+                <div class="wheel-container">
+                    <div class="wheel-pointer"></div>
+                    <!-- Canvas element where the JS will draw the wheel -->
+                    <canvas id="wheelCanvas" width="800" height="800" aria-label="Business Idea Spin Wheel"></canvas>
+                    
+                    <button id="spinBtn" class="spin-btn-center" aria-label="Spin the wheel">
+                        <span class="spin-icon">↻</span>
+                        <span>SPIN</span>
+                    </button>
+                </div>
+                
+                <!-- Spin Counter -->
+                <div class="mt-8 px-4 py-2 rounded-full glass inline-flex items-center gap-2 text-sm font-medium text-slate-300 border border-brand-border">
+                    <span>🎯</span> <span id="spinCountDisplay">0 spins</span>
+                </div>
+            </div>
+
+            <!-- Right Column: Result & History -->
+            <div class="lg:col-span-5 flex flex-col gap-6">
+                
+                <!-- Current Result Card -->
+                <div id="resultCard" class="glass rounded-2xl p-6 border border-brand-border shadow-2xl relative overflow-hidden transition-all duration-300 min-h-[250px] flex flex-col">
+                    <!-- Top accent line -->
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-purple-500"></div>
+                    
+                    <div class="flex justify-between items-start mb-4">
+                        <h2 class="text-sm font-bold tracking-wider text-slate-400 uppercase">Your Idea</h2>
+                        <span id="resultIdBadge" class="text-sm font-mono text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800/50">#---</span>
+                    </div>
+
+                    <!-- State: Waiting (Before Spin) -->
+                    <div id="waitingState" class="flex-grow flex flex-col items-center justify-center text-center opacity-100 transition-opacity duration-300">
+                        <div class="text-6xl mb-4 opacity-50">?</div>
+                        <h3 class="text-xl font-bold mb-2">Spin the wheel</h3>
+                        <p class="text-slate-400 text-sm">Waiting for your idea...<br/>Press the SPIN button to discover a random online business idea.</p>
+                    </div>
+
+                    <!-- State: Result (After Spin) - Initially hidden -->
+                    <div id="activeResultState" class="hidden flex-grow flex-col">
+                        <div class="flex items-start gap-4 mb-4">
+                            <div id="resultIcon" class="text-5xl bg-brand-dark p-3 rounded-xl border border-brand-border shadow-inner">💡</div>
+                            <div>
+                                <span id="resultCategory" class="text-xs font-bold tracking-wider text-purple-400 uppercase bg-purple-950/30 px-2 py-1 rounded-md mb-1 inline-block">Category</span>
+                                <h3 id="resultTitle" class="text-2xl font-bold text-white leading-tight">Business Name</h3>
+                            </div>
+                        </div>
+                        <p id="resultDesc" class="text-slate-300 text-sm md:text-base leading-relaxed flex-grow italic">
+                            "Description goes here..."
+                        </p>
+                        <div class="mt-6">
+                            <button id="exploreIdeaBtn" class="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 group">
+                                <span class="group-hover:scale-110 transition-transform">💡</span> Explore This Idea
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Section -->
+                <div class="glass rounded-2xl p-6 border border-brand-border">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-semibold text-slate-200">Recent Ideas</h3>
+                        <button id="clearHistoryBtn" class="text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/5">Clear</button>
+                    </div>
+                    
+                    <ul id="historyList" class="space-y-3">
+                        <!-- History items populated via JS -->
+                        <li class="text-center text-slate-500 text-sm py-4 italic" id="emptyHistoryMsg">No ideas spun yet.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explore Section (All Ideas) -->
+        <div id="exploreSection" class="pt-12 border-t border-brand-border/50 scroll-mt-24">
+            <div class="mb-8">
+                <p class="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-2">EXPLORE</p>
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <h2 class="text-3xl font-bold">All Business Ideas <span class="text-slate-500 text-lg font-normal ml-2">63 ideas</span></h2>
+                    
+                    <!-- Search Input -->
+                    <div class="relative w-full md:w-72">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <input type="text" id="searchInput" placeholder="Search business ideas..." class="block w-full pl-10 pr-3 py-2 border border-brand-border rounded-xl leading-5 bg-brand-card/50 text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories Filter -->
+            <div class="mb-8 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+                <div id="categoryFilters" class="flex flex-wrap gap-2 min-w-max sm:min-w-0">
+                    <!-- Filters populated by JS -->
+                </div>
+            </div>
+            
+            <div class="mb-4 text-sm text-slate-400 h-5" id="resultsCount">Showing 63 ideas</div>
+
+            <!-- Idea Cards Grid -->
+            <div id="ideasGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <!-- Cards injected here via JS -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-brand-border mt-auto py-8 text-center text-slate-500 text-sm">
+        <p>BizSpin &copy; 2026. Find an idea. Build it. Launch it.</p>
+    </footer>
+
+    <!-- Application Logic -->
+    <script>
+        /**
+         * 1. BUSINESS IDEAS DATABASE
+         * Complete list of 63 required ideas grouped by category.
+         */
+        const businessIdeas = [
+            // Tech
+            { id: 1, title: "Micro-SaaS", category: "Tech", icon: "⚙️", desc: "Build one focused software tool that solves a specific problem." },
+            { id: 2, title: "AI Website Builder", category: "Tech", icon: "🌐", desc: "Create a tool that generates basic websites using AI prompts." },
+            { id: 3, title: "AI Resume Builder", category: "Tech", icon: "📄", desc: "Help job seekers create optimized resumes tailored to job descriptions." },
+            { id: 4, title: "Invoice Generator SaaS", category: "Tech", icon: "🧾", desc: "A simple, clean invoicing tool for freelancers and small businesses." },
+            { id: 5, title: "QR Code Platform", category: "Tech", icon: "📱", desc: "Generate dynamic QR codes with tracking and custom designs." },
+            { id: 6, title: "Online Portfolio Builder", category: "Tech", icon: "🎨", desc: "A platform for creatives to showcase their work easily." },
+            { id: 7, title: "File Conversion Website", category: "Tech", icon: "🔄", desc: "Tool to convert PDFs, images, and documents between formats." },
+            { id: 8, title: "Website Monitoring Service", category: "Tech", icon: "📈", desc: "Alert website owners when their site goes down." },
+            
+            // SaaS
+            { id: 9, title: "Appointment Booking SaaS", category: "SaaS", icon: "📅", desc: "Scheduling software for local service professionals." },
+            { id: 10, title: "Local Business Dashboard", category: "SaaS", icon: "📊", desc: "Analytics and review management for brick-and-mortar stores." },
+            { id: 11, title: "Inventory System", category: "SaaS", icon: "📦", desc: "Simple stock tracking software for small e-commerce sellers." },
+            { id: 12, title: "Digital Receipt System", category: "SaaS", icon: "🎫", desc: "Allow shops to send SMS/Email receipts instead of paper." },
+            
+            // AI
+            { id: 13, title: "AI Customer Support Bot", category: "AI", icon: "🤖", desc: "Custom-trained chatbots for e-commerce websites." },
+            { id: 14, title: "AI FAQ Generator", category: "AI", icon: "❓", desc: "Automatically generate FAQ sections by scanning a website." },
+            { id: 15, title: "AI Product Description Tool", category: "AI", icon: "✍️", desc: "Write compelling product copy for online stores instantly." },
+            { id: 16, title: "AI Social Caption Tool", category: "AI", icon: "📱", desc: "Generate engaging captions and hashtags for Instagram/TikTok." },
+            { id: 17, title: "AI Document Summarizer", category: "AI", icon: "📑", desc: "Condense long PDFs or articles into quick summaries." },
+            { id: 18, title: "AI Meeting Notes Tool", category: "AI", icon: "🎙️", desc: "Transcribe and summarize online meetings automatically." },
+            { id: 19, title: "Local-Language AI Assistant", category: "AI", icon: "🗣️", desc: "AI tools specifically tuned for regional languages (e.g., Malayalam)." },
+            
+            // Creator
+            { id: 20, title: "Link-in-Bio Builder", category: "Creator", icon: "🔗", desc: "Create a customizable landing page for social media profiles." },
+            { id: 21, title: "YouTube Title Generator", category: "Creator", icon: "📺", desc: "Help YouTubers come up with click-worthy video titles." },
+            { id: 22, title: "YouTube Branding Service", category: "Creator", icon: "🖌️", desc: "Design channel banners, logos, and intros for creators." },
+            { id: 23, title: "Creator Asset Marketplace", category: "Creator", icon: "🛍️", desc: "Sell overlays, sound effects, and presets to streamers." },
+            
+            // Education
+            { id: 24, title: "Student Study Platform", category: "Education", icon: "📚", desc: "A centralized hub for organizing notes and assignments." },
+            { id: 25, title: "School Management SaaS", category: "Education", icon: "🏫", desc: "Digital attendance and grading system for small schools." },
+            { id: 26, title: "AI Study Question Generator", category: "Education", icon: "🧠", desc: "Turn any text into multiple-choice quizzes for studying." },
+            { id: 27, title: "Online Tutoring", category: "Education", icon: "👨‍🏫", desc: "Offer 1-on-1 sessions via video call for specific subjects." },
+            { id: 28, title: "Exam Notes Website", category: "Education", icon: "📝", desc: "Sell high-quality, organized notes for university courses." },
+            { id: 29, title: "Kerala Student Platform", category: "Education", icon: "🌴", desc: "Resources and guides specifically for students in Kerala." },
+            { id: 30, title: "Programming Courses", category: "Education", icon: "💻", desc: "Create and sell specialized coding tutorials." },
+            { id: 31, title: "Printable Study Planner", category: "Education", icon: "🗓️", desc: "Design aesthetic planners for students to download and print." },
+            { id: 32, title: "Digital Flashcards", category: "Education", icon: "🃏", desc: "An app or platform for spaced repetition learning." },
+            { id: 33, title: "Exam Question Bank", category: "Education", icon: "🏦", desc: "Curated collection of past papers and practice questions." },
+            { id: 34, title: "Language Learning Platform", category: "Education", icon: "🌐", desc: "Interactive tools to help people learn a new language." },
+            { id: 35, title: "Computer Skills Course", category: "Education", icon: "⌨️", desc: "Basic digital literacy courses for older demographics." },
+            
+            // Developer
+            { id: 36, title: "AI Code Explanation Tool", category: "Developer", icon: "🔍", desc: "Explain complicated code in beginner-friendly language." },
+            { id: 37, title: "Coding Practice Website", category: "Developer", icon: "🎯", desc: "Platform offering daily coding challenges and solutions." },
+            { id: 38, title: "Website Template Store", category: "Developer", icon: "🎨", desc: "Design and sell premium HTML/CSS/Tailwind templates." },
+            { id: 39, title: "Code Template Store", category: "Developer", icon: "🧩", desc: "Sell boilerplate code for React, Node, or mobile apps." },
+            
+            // Creative
+            { id: 40, title: "YouTube Thumbnail Service", category: "Creative", icon: "🖼️", desc: "Design high-CTR thumbnails for video creators." },
+            { id: 41, title: "Short-Form Video Editing", category: "Creative", icon: "✂️", desc: "Edit podcasts into TikToks/Reels with captions." },
+            { id: 42, title: "Website Design Service", category: "Creative", icon: "✨", desc: "Offer UI/UX and web design for small businesses." },
+            { id: 43, title: "Logo & Brand Design", category: "Creative", icon: "✒️", desc: "Create brand identities for new startups." },
+            { id: 44, title: "Presentation Design", category: "Creative", icon: "📊", desc: "Beautify PowerPoint/Pitch decks for corporate clients." },
+            { id: 45, title: "Product Photo Editing", category: "Creative", icon: "📸", desc: "Retouch and format images for e-commerce stores." },
+            
+            // Marketing
+            { id: 46, title: "Social Media Management", category: "Marketing", icon: "📈", desc: "Handle posting and engagement for local businesses." },
+            
+            // Digital
+            { id: 47, title: "Canva Template Store", category: "Digital", icon: "🎨", desc: "Sell pre-made designs for social media and marketing." },
+            { id: 48, title: "Digital Invitation Store", category: "Digital", icon: "💌", desc: "Design animated or static e-invites for weddings/events." },
+            { id: 49, title: "Digital Products Store", category: "Digital", icon: "🛍️", desc: "Sell ebooks, guides, or digital art online." },
+            { id: 50, title: "Phone Wallpaper Store", category: "Digital", icon: "📱", desc: "Create and sell premium wallpaper packs." },
+            { id: 51, title: "Notion Template Store", category: "Digital", icon: "📓", desc: "Build productivity systems and sell them as Notion templates." },
+            
+            // E-commerce
+            { id: 52, title: "Print-on-Demand Store", category: "E-commerce", icon: "👕", desc: "Sell custom t-shirts and mugs without holding inventory." },
+            { id: 53, title: "Niche Clothing Brand", category: "E-commerce", icon: "👗", desc: "Start a targeted apparel line (e.g., for developers)." },
+            
+            // Gaming
+            { id: 54, title: "Gaming Assets Store", category: "Gaming", icon: "🎮", desc: "Sell 2D/3D sprites, models, or UI kits for game devs." },
+            { id: 55, title: "Minecraft Creator Assets", category: "Gaming", icon: "⛏️", desc: "Design skins, texture packs, or maps." },
+            
+            // Local
+            { id: 56, title: "Kerala Business Directory", category: "Local", icon: "📖", desc: "A curated online list of reliable local businesses." },
+            { id: 57, title: "Local Service Marketplace", category: "Local", icon: "🛠️", desc: "Connect local plumbers/electricians with customers." },
+            { id: 58, title: "Local Food Discovery", category: "Local", icon: "🍛", desc: "An Instagram page or blog reviewing local restaurants." },
+            { id: 59, title: "Kerala Tourism Planner", category: "Local", icon: "✈️", desc: "Offer customized digital itineraries for tourists." },
+            { id: 60, title: "Local Event Platform", category: "Local", icon: "🎟️", desc: "List upcoming workshops, shows, and events in the city." },
+            { id: 61, title: "Shop Digitalization Service", category: "Local", icon: "🏪", desc: "Help traditional shops set up Google My Business and payments." },
+            { id: 62, title: "WhatsApp Catalog Service", category: "Local", icon: "💬", desc: "Set up and manage WhatsApp Business catalogs for shops." },
+            
+            // Marketplace
+            { id: 63, title: "Student Freelance Marketplace", category: "Marketplace", icon: "🤝", desc: "Platform connecting college students for gig work." }
+        ];
+
+        /**
+         * STREAMING_CHUNK:Setting up State Variables and LocalStorage handling...
+         * 2. STATE & LOCAL STORAGE
+         */
+        const STORAGE_KEY_COUNT = 'bizspin-count';
+        const STORAGE_KEY_HISTORY = 'bizspin-history';
+
+        let spinCount = parseInt(localStorage.getItem(STORAGE_KEY_COUNT) || '0', 10);
+        let spinHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+        
+        let currentFilter = 'All';
+        let searchQuery = '';
+
+        // DOM Elements
+        const spinCountDisplay = document.getElementById('spinCountDisplay');
+        const historyList = document.getElementById('historyList');
+        const emptyHistoryMsg = document.getElementById('emptyHistoryMsg');
+        
+        function updateStorage() {
+            localStorage.setItem(STORAGE_KEY_COUNT, spinCount.toString());
+            localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(spinHistory));
+        }
+
+        function updateUI() {
+            spinCountDisplay.textContent = `${spinCount} spin${spinCount !== 1 ? 's' : ''}`;
+            renderHistory();
+        }
+
+        /**
+         * STREAMING_CHUNK:Implementing History Rendering...
+         */
+        function renderHistory() {
+            // Keep only last 5 in memory
+            if (spinHistory.length > 5) {
+                spinHistory = spinHistory.slice(0, 5);
+            }
+
+            historyList.innerHTML = '';
+            
+            if (spinHistory.length === 0) {
+                historyList.appendChild(emptyHistoryMsg);
+                emptyHistoryMsg.style.display = 'block';
+                return;
+            }
+            
+            emptyHistoryMsg.style.display = 'none';
+            
+            spinHistory.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-3 p-2 rounded-lg bg-brand-dark/50 border border-brand-border/50 animate-fade-in';
+                li.style.animationDelay = `${index * 50}ms`;
+                li.innerHTML = `
+                    <span class="text-xl w-8 text-center">${item.icon}</span>
+                    <div class="flex-grow min-w-0">
+                        <p class="text-sm font-semibold text-slate-200 truncate">${item.title}</p>
+                        <p class="text-xs text-slate-500">${item.category}</p>
+                    </div>
+                `;
+                historyList.appendChild(li);
+            });
+        }
+
+        function addHistory(idea) {
+            spinHistory.unshift(idea); // Add to beginning
+            if(spinHistory.length > 5) spinHistory.pop();
+            updateStorage();
+            renderHistory();
+        }
+
+        document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+            spinHistory = [];
+            updateStorage();
+            renderHistory();
+        });
+
+        /**
+         * STREAMING_CHUNK:Configuring the Canvas Wheel Drawing Logic...
+         * 3. WHEEL LOGIC (Canvas API)
+         */
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        
+        // Define colors for segments
+        const colors = ['#0f172a', '#1e293b']; // Alternating dark colors
+        const accentColors = ['#06b6d4', '#8b5cf6', '#3b82f6']; // Cyan, Purple, Blue
+        
+        // Wheel configuration
+        const wheelRadius = canvas.width / 2;
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const totalSegments = businessIdeas.length;
+        const arcSize = (2 * Math.PI) / totalSegments;
+        
+        let currentAngle = 0; // Current rotation of the wheel
+        let isSpinning = false;
+        let animationFrameId;
+
+        // Easing function for smooth spin stop (Ease Out Quart)
+        function easeOutQuart(t) {
+            return 1 - (--t) * t * t * t;
+        }
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(currentAngle);
+            
+            for (let i = 0; i < totalSegments; i++) {
+                const idea = businessIdeas[i];
+                const startingAngle = i * arcSize;
+                const endingAngle = startingAngle + arcSize;
+                
+                // Draw Segment
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, wheelRadius - 10, startingAngle, endingAngle); // -10 for padding
+                ctx.closePath();
+                
+                // Base alternate colors
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                
+                // Stroke separator
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.stroke();
+
+                // Draw Text & Icon (Only show some to avoid crowding, e.g., every 3rd or just icon)
+                // Since 63 is large, we'll draw text but make it small and subtle
+                ctx.save();
+                // Rotate to center of current slice
+                ctx.rotate(startingAngle + arcSize / 2);
+                
+                // Align text to right (outer edge)
+                ctx.textAlign = "right";
+                ctx.textBaseline = "middle";
+                
+                // Highlight every 5th segment with an accent color to make wheel look lively
+                if (i % 5 === 0) {
+                    ctx.fillStyle = accentColors[(i/5) % accentColors.length];
+                    // Small glowing dot
+                    ctx.beginPath();
+                    ctx.arc(wheelRadius - 30, 0, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+
+                ctx.fillStyle = i % 5 === 0 ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.3)";
+                ctx.font = i % 5 === 0 ? "bold 14px Inter, sans-serif" : "12px Inter, sans-serif";
+                
+                // Draw Icon and shortened title for readability
+                const displayTitle = idea.title.length > 15 ? idea.title.substring(0, 12) + '...' : idea.title;
+                
+                // Only render text for every 2nd or 3rd to prevent overlap if needed, 
+                // but at 800x800 canvas, 63 items is ~5.7 degrees each. 
+                // It will be tight. Let's just draw the icon and ID near the edge.
+                
+                ctx.fillText(`${idea.icon} ${idea.id}`, wheelRadius - 50, 0);
+                
+                ctx.restore();
+            }
+            
+            ctx.restore();
+        }
+
+        /**
+         * STREAMING_CHUNK:Implementing the Spin Animation Loop...
+         */
+        function spinWheel() {
+            if (isSpinning) return;
+            isSpinning = true;
+            spinBtn.disabled = true;
+
+            // Prepare Result Card for new spin
+            document.getElementById('activeResultState').classList.add('hidden');
+            document.getElementById('waitingState').classList.remove('hidden');
+            const resultCard = document.getElementById('resultCard');
+            resultCard.classList.remove('result-entrance');
+
+            // Select random idea
+            const selectedIndex = Math.floor(Math.random() * totalSegments);
+            const selectedIdea = businessIdeas[selectedIndex];
+            
+            // Calculate angles
+            // The pointer is at the TOP (270 degrees or 1.5 PI)
+            // We want the center of the selected segment to end up at the top.
+            
+            const segmentCenterAngle = (selectedIndex * arcSize) + (arcSize / 2);
+            
+            // To align with top pointer, the wheel needs to rotate such that
+            // currentAngle + segmentCenterAngle = 270 deg (or -90 deg)
+            // Normalizing everything to radians
+            const pointerAngle = -Math.PI / 2; // Top
+            
+            // Target angle for the wheel to make the segment align with top
+            // target = pointer - segment + full rotations
+            const fullRotations = Math.PI * 2 * (5 + Math.floor(Math.random() * 3)); // 5 to 7 full spins
+            
+            // Final exact angle the wheel needs to land on
+            const targetAngle = pointerAngle - segmentCenterAngle + fullRotations;
+            
+            const startAngle = currentAngle;
+            const angleDifference = targetAngle - startAngle;
+            
+            const spinDuration = 5000; // 5 seconds
+            let startTime = null;
+
+            function animateSpin(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = timestamp - startTime;
+                
+                // Normalize progress 0 to 1
+                let t = progress / spinDuration;
+                if (t > 1) t = 1;
+                
+                // Apply easing
+                const easeT = easeOutQuart(t);
+                
+                // Update angle
+                currentAngle = startAngle + (angleDifference * easeT);
+                
+                drawWheel();
+                
+                if (t < 1) {
+                    animationFrameId = requestAnimationFrame(animateSpin);
+                } else {
+                    // Spin finished
+                    finishSpin(selectedIdea);
+                }
+            }
+            
+            requestAnimationFrame(animateSpin);
+        }
+
+        /**
+         * STREAMING_CHUNK:Handling the Post-Spin Result Display...
+         */
+        function finishSpin(idea) {
+            isSpinning = false;
+            spinBtn.disabled = false;
+            
+            // Normalize angle to stay within 0-2PI to prevent huge numbers over many spins
+            currentAngle = currentAngle % (Math.PI * 2);
+            
+            // Update counts
+            spinCount++;
+            addHistory(idea);
+            updateUI();
+            
+            // Update Result Card DOM
+            document.getElementById('resultIdBadge').textContent = `#${idea.id.toString().padStart(2, '0')}`;
+            document.getElementById('resultIcon').textContent = idea.icon;
+            document.getElementById('resultCategory').textContent = idea.category;
+            document.getElementById('resultTitle').textContent = idea.title;
+            document.getElementById('resultDesc').textContent = `"${idea.desc}"`;
+            
+            // Store selected ID in the explore button dataset
+            document.getElementById('exploreIdeaBtn').dataset.targetId = idea.id;
+
+            // Switch views with animation
+            document.getElementById('waitingState').classList.add('hidden');
+            const activeState = document.getElementById('activeResultState');
+            activeState.classList.remove('hidden');
+            activeState.classList.add('flex');
+            
+            const resultCard = document.getElementById('resultCard');
+            resultCard.classList.remove('result-entrance');
+            void resultCard.offsetWidth; // Trigger reflow
+            resultCard.classList.add('result-entrance');
+        }
+
+        spinBtn.addEventListener('click', spinWheel);
+
+        /**
+         * STREAMING_CHUNK:Building the Explore Grid and Search/Filter Functionality...
+         * 4. EXPLORE SECTION & FILTERING
+         */
+        
+        const ideasGrid = document.getElementById('ideasGrid');
+        const searchInput = document.getElementById('searchInput');
+        const categoryFiltersContainer = document.getElementById('categoryFilters');
+        const resultsCountDisplay = document.getElementById('resultsCount');
+
+        // Extract unique categories
+        const categories = ['All', ...new Set(businessIdeas.map(idea => idea.category))];
+
+        function initFilters() {
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = `filter-btn px-4 py-2 rounded-full text-sm font-medium border border-brand-border transition-all ${cat === 'All' ? 'active' : 'text-slate-400 hover:text-white hover:bg-white/5'}`;
+                btn.textContent = cat;
+                btn.dataset.category = cat;
+                
+                btn.addEventListener('click', () => {
+                    // Update active state
+                    document.querySelectorAll('.filter-btn').forEach(b => {
+                        b.classList.remove('active');
+                        b.classList.add('text-slate-400', 'hover:text-white', 'hover:bg-white/5');
+                        b.style.background = '';
+                        b.style.color = '';
+                        b.style.borderColor = '';
+                    });
+                    btn.classList.add('active');
+                    btn.classList.remove('text-slate-400', 'hover:text-white', 'hover:bg-white/5');
+                    
+                    currentFilter = cat;
+                    renderGrid();
+                });
+                
+                categoryFiltersContainer.appendChild(btn);
+            });
+        }
+
+        /**
+         * STREAMING_CHUNK:Rendering the Filtered Cards...
+         */
+        function renderGrid() {
+            ideasGrid.innerHTML = '';
+            
+            const query = searchQuery.toLowerCase();
+            
+            const filteredIdeas = businessIdeas.filter(idea => {
+                // Filter by category
+                const matchCategory = currentFilter === 'All' || idea.category === currentFilter;
+                
+                // Filter by search term (title, desc, category, or ID)
+                const matchSearch = query === '' || 
+                                    idea.title.toLowerCase().includes(query) ||
+                                    idea.desc.toLowerCase().includes(query) ||
+                                    idea.category.toLowerCase().includes(query) ||
+                                    idea.id.toString() === query;
+                                    
+                return matchCategory && matchSearch;
+            });
+            
+            resultsCountDisplay.textContent = `Showing ${filteredIdeas.length} idea${filteredIdeas.length !== 1 ? 's' : ''}`;
+            
+            if (filteredIdeas.length === 0) {
+                ideasGrid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500">No business ideas found matching your criteria.</div>`;
+                return;
+            }
+
+            filteredIdeas.forEach(idea => {
+                const card = document.createElement('div');
+                // ID added for scrolling anchor
+                card.id = `idea-card-${idea.id}`;
+                card.className = 'glass rounded-xl p-5 border border-brand-border hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10 hover:-translate-y-1 flex flex-col h-full';
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="text-3xl bg-brand-dark/50 p-2 rounded-lg border border-white/5">${idea.icon}</div>
+                        <span class="text-xs font-mono text-slate-500">#${idea.id.toString().padStart(2, '0')}</span>
+                    </div>
+                    <span class="text-[10px] font-bold tracking-widest text-purple-400 uppercase mb-1">${idea.category}</span>
+                    <h3 class="text-lg font-bold text-white mb-2 leading-tight">${idea.title}</h3>
+                    <p class="text-slate-400 text-sm flex-grow">${idea.desc}</p>
+                `;
+                ideasGrid.appendChild(card);
+            });
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            renderGrid();
+        });
+
+        /**
+         * STREAMING_CHUNK:Binding the Explore Button Action...
+         */
+        // Explore Button Logic (Scrolls to and highlights card)
+        document.getElementById('exploreIdeaBtn').addEventListener('click', function() {
+            const targetId = this.dataset.targetId;
+            if(!targetId) return;
+
+            // Reset filters to ensure the card is visible
+            currentFilter = 'All';
+            searchQuery = '';
+            searchInput.value = '';
+            
+            // Update filter buttons UI
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                if(b.dataset.category === 'All') {
+                    b.classList.add('active');
+                    b.classList.remove('text-slate-400', 'hover:text-white', 'hover:bg-white/5');
+                } else {
+                    b.classList.remove('active');
+                    b.classList.add('text-slate-400', 'hover:text-white', 'hover:bg-white/5');
+                    b.style.background = '';
+                    b.style.color = '';
+                    b.style.borderColor = '';
+                }
+            });
+
+            renderGrid();
+
+            // Find element and scroll
+            setTimeout(() => {
+                const targetCard = document.getElementById(`idea-card-${targetId}`);
+                if (targetCard) {
+                    targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Add highlight effect
+                    targetCard.classList.add('ring-2', 'ring-purple-500', 'shadow-purple-500/50');
+                    setTimeout(() => {
+                        targetCard.classList.remove('ring-2', 'ring-purple-500', 'shadow-purple-500/50');
+                    }, 2000);
+                }
+            }, 100); // slight delay to allow render
+        });
+
+
+        /**
+         * STREAMING_CHUNK:Finalizing Initialization...
+         * 5. INITIALIZATION
+         */
+        window.addEventListener('load', () => {
+            // Draw initial wheel
+            drawWheel();
+            
+            // Update UI from storage
+            updateUI();
+            
+            // Init explore section
+            initFilters();
+            renderGrid();
+        });
+
+        // Handle resize for canvas (prevent distortion by maintaining 1:1 aspect ratio via CSS, 
+        // canvas internal resolution stays 800x800 for crispness)
+
+    </script>
+</body>
+</html>
